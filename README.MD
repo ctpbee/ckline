@@ -39,7 +39,7 @@ class Main(CtpbeeApi):
 
 
 if __name__ == '__main__':
-    kline = Kline("hello ctpbee kline")
+    kline = Kline()
     app = CtpBee("market", __name__, refresh=True).with_tools(kline)
     example = Main("DailyCTA")
     app.config.from_json("config.json")
