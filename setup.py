@@ -4,7 +4,7 @@ pkg = find_packages()
 install_requires = ["ctpbee"]
 setup(
     name='ctpbee_kline',
-    version='0.1',
+    version='0.2',
     description='ctpbee里面提供的k线生成算法',
     author='somewheve',
     author_email='somewheve@gmail.com',

@@ -38,7 +38,7 @@ class Kline(Tool):
             # high
             self.bars[tick.local_symbol][1] = max(self.bars[tick.local_symbol][1], tick.last_price)
             # low
-            self.bars[tick.local_symbol][3] = min(self.bars[tick.local_symbol][1], tick.last_price)
+            self.bars[tick.local_symbol][3] = min(self.bars[tick.local_symbol][3], tick.last_price)
             # close
             self.bars[tick.local_symbol][4] = tick.last_price
             return None
