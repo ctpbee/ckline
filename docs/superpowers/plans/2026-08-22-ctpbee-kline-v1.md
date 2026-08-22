@@ -611,8 +611,8 @@ def test_daily_night_session():
     ], closed)
     check("周二交易日 bar 闭合", len(closed) == 1)
     check("datetime = 周二 00:00", closed[0].datetime == datetime(2025, 1, 7))
-    check("O=4000 H=4010 L=4000 C=4005 V=100",
-          ohlcv(closed[0]) == (4000.0, 4010.0, 4000.0, 4005.0, 100))
+    check("O=4000 H=4010 L=4000 C=4010 V=100 (边界 tick 开新 bar)",
+          ohlcv(closed[0]) == (4000.0, 4010.0, 4000.0, 4010.0, 100))
 
 
 def test_weekly_anchor():
@@ -630,8 +630,8 @@ def test_weekly_anchor():
           closed[0].datetime == datetime(2024, 12, 30))
     check("第二根锚定 2025-01-06",
           closed[1].datetime == datetime(2025, 1, 6))
-    check("本周 O=510 H=515 L=505 C=515 V=10",
-          ohlcv(closed[1]) == (510.0, 515.0, 505.0, 515.0, 10))
+    check("本周 O=510 H=510 L=505 C=505 V=10 (下周一 tick 开新 bar)",
+          ohlcv(closed[1]) == (510.0, 510.0, 505.0, 505.0, 10))
 
 
 def test_daily_ignores_bars():
