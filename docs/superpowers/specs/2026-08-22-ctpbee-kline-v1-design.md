@@ -123,10 +123,13 @@ dt.date()          其余(含 <03:00 凌晨夜盘与日盘)
 
 ### 5.4 分发: 只用原语
 
-`_Aggregator.emit(bar)` 以 `@tool_register(spec.key)` 装饰并返回 bar——
+`_Aggregator.emit(bar)` 以 `@tool_register(BAR_KEY)` 装饰并返回 bar——
 **仅在闭合时被调用**,订阅者每次必收到真 bar,永不收到 None。
+通道键 `BAR_KEY = "bar"` 是类级常量(装饰键在类定义时固化,不能取每实例
+的 `spec.key`),路由靠"每个聚合器实例各自持有 `_linked` 回调表"实现——
+不同实例互不串扰,效果等同按周期分通道。
 
-- 订阅: `register_tool_hook(agg, spec.key, func)`;退订: `unregister_tool_hook`
+- 订阅: `register_tool_hook(agg, BAR_KEY, func)`;退订: `unregister_tool_hook`
 - 快照迭代、异常隔离+节流日志、去重、保序——全部由 `ctpbee.tool_register` 提供
 
 ### 5.5 查询与历史缓存
@@ -134,6 +137,9 @@ dt.date()          其余(含 <03:00 凌晨夜盘与日盘)
 - 每合约 `deque(maxlen=history)` 存闭合 bar;闭合时**先 append 历史再 emit**
 - `get_current(symbol) -> BarData | None`: 未闭合 bar 的快照(构造 BarData 返回,不动内部状态)
 - `get_bars(symbol, n=None) -> list[BarData]`: 最近 n 根闭合 bar(默认全部)
+- Kline 级便捷查询 `get_current(symbol, interval=None)` /
+  `get_bars(symbol, n=None, interval=None)`: 单周期实例可省略 `interval`,
+  多周期实例必须指定(否则 `ValueError` 列出可选周期)
 
 ## 6. `__init__.py` — `Kline(Tool)` 公开 API
 
@@ -199,7 +205,7 @@ kline.unsubscribe("5m", func)
 | 套件 | 覆盖 |
 |---|---|
 | `tests/test_interval.py` | 解析合法/非法/任意 N;分桶对齐(1m~30m, 1h~4h, 7m, 3h, d, w);交易日规则(20:00 边界前后、00:30 夜盘、02:30/03:00、日盘、trading_day 属性优先);周锚定(周三→周一、跨月周) |
-| `tests/test_aggregator.py` | OHLC 更新/差分/闭合/跳跃(中间缺 tick)/多合约独立/累计量重置/乱序不闭合;emit 仅闭合时触发(hook 计数=闭合数,永不 None);tick 与 bar 两路等价(同一分钟序列两种喂法 → 相同高周期 bar);历史缓存与 get_current 快照不可变性 |
+| `tests/test_aggregator.py` | OHLC 更新/差分/闭合/跳跃(中间缺 tick)/多合约独立/累计量重置(含重置后新差分计入)/乱序不闭合;emit 仅闭合时触发(hook 计数=闭合数,永不 None);坏 hook 异常隔离不进聚合链;tick 与 bar 两路等价(同一分钟序列两种喂法 → 相同高周期 bar);历史缓存与 get_current 快照 |
 | `tests/test_kline_tool.py` | FakeApp(假 `_extensions`/`tools` dict)下: init_app 接线;**后注册策略收到 bar**;显式订阅/退订/合约过滤;`Kline("5m")` 兼容与命名 `kline_5m`;多周期扇出互不串扰;auto_wire=False;默认 1m |
 
 环境前置: 当前 `ctpbee` editable 安装的 finder 在非仓库 cwd 下损坏
