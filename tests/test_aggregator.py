@@ -253,22 +253,43 @@ def test_daily_night_session():
 
 
 def test_weekly_anchor():
-    print("── 周线锚定交易周 ──")
+    print("── 周线锚定交易周(周末感知) ──")
     agg = _Aggregator(parse_interval("w"))
     closed = []
     feed_ticks(agg, [
-        make_tick("rb2505", "SHFE", datetime(2025, 1, 4, 0, 30), 500.0, 10),   # 周六凌晨 → 上交易周(跨年)
-        make_tick("rb2505", "SHFE", datetime(2025, 1, 8, 10, 0), 510.0, 20),   # 周三 → 本周一 → 闭合上周
-        make_tick("rb2505", "SHFE", datetime(2025, 1, 10, 22, 0), 505.0, 30),  # 周五夜盘 → 交易日周六, 仍属本周一
-        make_tick("rb2505", "SHFE", datetime(2025, 1, 13, 9, 0), 515.0, 40),   # 下周一 → 闭合本周
+        make_tick("rb2505", "SHFE", datetime(2025, 1, 4, 0, 30), 500.0, 10),   # 周六凌晨夜盘 → 交易日下周一(1/6)
+        make_tick("rb2505", "SHFE", datetime(2025, 1, 8, 10, 0), 510.0, 20),   # 周三 → 同属 1/6 周
+        make_tick("rb2505", "SHFE", datetime(2025, 1, 10, 22, 0), 505.0, 30),  # 周五夜盘 → 交易日下周一(1/13) → 闭合 1/6 周
+        make_tick("rb2505", "SHFE", datetime(2025, 1, 13, 9, 0), 515.0, 40),   # 下周一 → 并入 1/13 周
     ], closed)
-    check("闭合 2 根周线", len(closed) == 2)
-    check("第一根锚定 2024-12-30 (跨年)",
-          closed[0].datetime == datetime(2024, 12, 30))
-    check("第二根锚定 2025-01-06",
-          closed[1].datetime == datetime(2025, 1, 6))
-    check("本周 O=510 H=510 L=505 C=505 V=10 (下周一 tick 开新 bar)",
-          ohlcv(closed[1]) == (510.0, 510.0, 505.0, 505.0, 10))
+    check("闭合 1 根周线(周五夜盘才切周)", len(closed) == 1)
+    check("锚定 2025-01-06 (周六凌晨与周三同周)",
+          closed[0].datetime == datetime(2025, 1, 6))
+    check("O=500 H=510 L=500 C=510 V=20",
+          ohlcv(closed[0]) == (500.0, 510.0, 500.0, 510.0, 20.0))
+
+
+def test_exchange_trading_day_preferred():
+    print("── 交易所口径 trading_day 优先于本地推断 ──")
+    agg = _Aggregator(parse_interval("d"))
+    closed = []
+    # 本地推断会给出"次日周六"; 交易所口径直接指定真实交易日(下周一)
+    feed_ticks(agg, [
+        TickData(symbol="rb2505", exchange="SHFE",
+                 local_symbol="rb2505.SHFE", trading_day="20250113",
+                 datetime=datetime(2025, 1, 10, 22, 0), last_price=500.0, volume=10),
+        TickData(symbol="rb2505", exchange="SHFE",
+                 local_symbol="rb2505.SHFE", trading_day="20250113",
+                 datetime=datetime(2025, 1, 13, 9, 0), last_price=505.0, volume=20),
+        TickData(symbol="rb2505", exchange="SHFE",
+                 local_symbol="rb2505.SHFE", trading_day="20250114",
+                 datetime=datetime(2025, 1, 14, 9, 0), last_price=510.0, volume=30),
+    ], closed)
+    check("周五夜盘与下周一同属一个交易日, 仅闭合 1 根日线",
+          len(closed) == 1)
+    check("该日线锚定 2025-01-13", closed[0].datetime == datetime(2025, 1, 13))
+    check("O=500 C=505 V=10", ohlcv(closed[0])[:1] + ohlcv(closed[0])[3:] ==
+          (500.0, 505.0, 10.0))
 
 
 def test_daily_ignores_bars():
@@ -331,7 +352,8 @@ if __name__ == "__main__":
                test_volume_reset, test_out_of_order, test_gap_jump,
                test_bar_driven_5m, test_tick_bar_equivalence,
                test_history_and_current, test_daily_night_session,
-               test_weekly_anchor, test_daily_ignores_bars,
+               test_weekly_anchor, test_exchange_trading_day_preferred,
+               test_daily_ignores_bars,
                test_emit_never_none_and_unsubscribe,
                test_hook_exception_isolated):
         fn()

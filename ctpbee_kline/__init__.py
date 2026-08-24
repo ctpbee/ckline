@@ -102,6 +102,11 @@ class Kline(Tool):
         if symbols is None:
             register_tool_hook(agg, BAR_KEY, func)
             return
+        # 同一函数重复订阅(换 symbols 集)时先摘掉旧包装, 否则退订只能
+        # 移除最后一个, 旧过滤集会一直留在通道里
+        old = self._sub_book.get((interval, func))
+        if old is not None:
+            unregister_tool_hook(agg, BAR_KEY, old)
         allow = set(symbols)
 
         def filtered(bar, _func=func, _allow=allow):

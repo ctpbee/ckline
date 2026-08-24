@@ -107,9 +107,10 @@ class _Aggregator:
         return self._build_bar(symbol, s)
 
     def get_bars(self, symbol, n=None):
-        """最近 n 根闭合 bar(默认全部); 返回列表副本。"""
+        """最近 n 根闭合 bar(默认全部); 返回列表副本。n<=0 返回空列表。"""
         h = self._history.get(symbol)
-        if h is None:
+        if h is None or n is not None and n <= 0:
+            # n<=0 显式判空: list[-0:] 是整个列表, 不是空
             return []
         return list(h)[-n:] if n is not None else list(h)
 

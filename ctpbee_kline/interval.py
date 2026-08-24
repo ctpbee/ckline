@@ -53,20 +53,45 @@ def parse_interval(spec):
     return IntervalSpec(value, "hour", spec, Interval.HOUR)
 
 
+def _next_session_day(d):
+    """d 的次一自然日向前跳过周末(周五夜盘/周末凌晨 -> 下周一)。"""
+    d = d + timedelta(days=1)
+    while d.weekday() >= 5:
+        d = d + timedelta(days=1)
+    return d
+
+
 def trading_day(dt):
-    """tick 时间 -> 所属交易日。>=20:00 属次日; 其余属当日(凌晨夜盘归当日)。"""
+    """tick 时间 -> 所属交易日(本地推断兜底, 交易所口径优先, 见 tick_trading_day)。
+
+    规则: >=20:00 属次一交易日; 周末凌晨(周六/周日 00:00-02:30 夜盘)属
+    下周一。周末会被跳过; 法定节假日无法本地判定, 仍按自然日推进——
+    精确口径请依赖数据自带的 trading_day。
+    """
+    d = dt.date()
+    if d.weekday() >= 5:  # 周末凌晨的夜盘 tick
+        return _next_session_day(d)
     if dt.hour >= _NIGHT_CUTOFF_HOUR:
-        return (dt + timedelta(days=1)).date()
-    return dt.date()
+        return _next_session_day(d)
+    return d
 
 
 def tick_trading_day(obj):
-    """取数据对象自带 trading_day(预留上游扩展); 无或类型不符返回 None。"""
+    """取数据对象自带 trading_day; 无或类型不符返回 None。
+
+    接受三种形态: ctpbee>=1.8 TickData 的 CTP 原始字符串("YYYYMMDD")、
+    date、datetime。上游未提供时由调用方退回本地推断(trading_day)。
+    """
     td = getattr(obj, "trading_day", None)
     if isinstance(td, datetime):
         return td.date()
     if isinstance(td, date):
         return td
+    if isinstance(td, str) and len(td) == 8 and td.isdigit():
+        try:
+            return datetime.strptime(td, "%Y%m%d").date()
+        except ValueError:
+            return None
     return None
 
 
